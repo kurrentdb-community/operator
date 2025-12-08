@@ -1,6 +1,4 @@
-# Simple Makefile for KurrentDB Community Operator (module root)
-
-IMG ?= ghcr.io/nemanja-tosic/kubernetes-kurrentdb-operator:latest
+IMG ?= ghcr.io/kurrentdb-community/operator:latest
 KUBECTL ?= kubectl
 
 .PHONY: help

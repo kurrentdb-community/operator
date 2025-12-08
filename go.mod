@@ -1,4 +1,4 @@
-module github.com/nemanja-tosic/kubernetes-kurrentdb-operator
+module github.com/kurrentdb-community/operator
 
 go 1.25
 

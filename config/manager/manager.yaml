@@ -43,7 +43,7 @@ spec:
         - /manager
         args:
         - --leader-elect
-        image: ghcr.io/nemanja-tosic/kubernetes-kurrentdb-operator:latest
+        image: ghcr.io/kurrentdb-community/operator:latest
         name: manager
         securityContext:
           allowPrivilegeEscalation: false

@@ -19,7 +19,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	kurrentv1 "github.com/nemanja-tosic/kubernetes-kurrentdb-operator/api/v1"
+	kurrentv1 "github.com/kurrentdb-community/operator/api/v1"
 )
 
 // KurrentClusterReconciler reconciles a KurrentCluster object

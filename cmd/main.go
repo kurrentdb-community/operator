@@ -14,8 +14,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
-	kurrentv1 "github.com/nemanja-tosic/kubernetes-kurrentdb-operator/api/v1"
-	"github.com/nemanja-tosic/kubernetes-kurrentdb-operator/controllers"
+	kurrentv1 "github.com/kurrentdb-community/operator/api/v1"
+	"github.com/kurrentdb-community/operator/controllers"
 	// +kubebuilder:scaffold:imports
 )
 
