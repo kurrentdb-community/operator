@@ -372,8 +372,9 @@ func (r *KurrentClusterReconciler) buildStatefulSet(cluster *kurrentv1.KurrentCl
 			Labels:    labels,
 		},
 		Spec: appsv1.StatefulSetSpec{
-			Replicas:    &cluster.Spec.Size,
-			ServiceName: fmt.Sprintf("%s-headless", cluster.Name),
+			Replicas:            &cluster.Spec.Size,
+			ServiceName:         fmt.Sprintf("%s-headless", cluster.Name),
+			PodManagementPolicy: appsv1.ParallelPodManagement,
 			UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
 				Type: appsv1.RollingUpdateStatefulSetStrategyType,
 				RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
