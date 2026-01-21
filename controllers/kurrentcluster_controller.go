@@ -423,7 +423,7 @@ func (r *KurrentClusterReconciler) buildEnvironmentVariables(cluster *kurrentv1.
 			},
 		},
 		{
-			Name: "KURRENTDB_NODE_IP_ADVERTISE_AS",
+			Name: "KURRENTDB_NODE_HOST_ADVERTISE_AS",
     		ValueFrom: &corev1.EnvVarSource{
       			FieldRef: &corev1.ObjectFieldSelector{
         			FieldPath: "status.podIP",
