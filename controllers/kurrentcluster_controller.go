@@ -423,6 +423,14 @@ func (r *KurrentClusterReconciler) buildEnvironmentVariables(cluster *kurrentv1.
 			},
 		},
 		{
+			Name: "KURRENTDB_NODE_IP_ADVERTISE_AS",
+    		ValueFrom: &corev1.EnvVarSource{
+      			FieldRef: &corev1.ObjectFieldSelector{
+        			FieldPath: "status.podIP",
+      			},
+    		},
+  		},
+		{
 			Name:  "KURRENTDB_CLUSTER_SIZE",
 			Value: strconv.Itoa(int(cluster.Spec.Size)),
 		},
