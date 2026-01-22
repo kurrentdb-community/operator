@@ -35,7 +35,7 @@ type KurrentClusterReconciler struct {
 //+kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch
+//+kubebuilder:rbac:groups="",resources=pods,verbs=get;list;watch;update;patch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -75,6 +75,14 @@ func (r *KurrentClusterReconciler) Reconcile(ctx context.Context, req ctrl.Reque
 	if err := r.reconcileStatefulSet(ctx, &kurrentCluster); err != nil {
 		logger.Error(err, "Failed to reconcile StatefulSet")
 		return ctrl.Result{}, err
+	}
+
+	// Handle Leader Election
+	if err := r.reconcileLeader(ctx, &kurrentCluster); err != nil {
+		logger.Error(err, "Failed to reconcile Leader")
+		// Don't fail the whole reconciliation if leader discovery fails,
+		// but requeue sooner to try again
+		return ctrl.Result{RequeueAfter: time.Second * 30}, nil
 	}
 
 	// Update status
@@ -224,7 +232,39 @@ func (r *KurrentClusterReconciler) reconcileServices(ctx context.Context, cluste
 		return err
 	}
 
-	return r.createOrUpdateService(ctx, clientService)
+	if err := r.createOrUpdateService(ctx, clientService); err != nil {
+		return err
+	}
+
+	// Create leader service
+	leaderService := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-leader", cluster.Name),
+			Namespace: cluster.Namespace,
+		},
+		Spec: corev1.ServiceSpec{
+			Type: corev1.ServiceTypeClusterIP,
+			Selector: map[string]string{
+				"app.kubernetes.io/name":     "kurrentdb",
+				"app.kubernetes.io/instance": cluster.Name,
+				"community.kurrent.io/role":  "leader",
+			},
+			Ports: []corev1.ServicePort{
+				{
+					Name:       "client",
+					Port:       cluster.Spec.Network.ExternalPort,
+					TargetPort: intstr.FromInt(int(cluster.Spec.Network.InternalPort)),
+					Protocol:   corev1.ProtocolTCP,
+				},
+			},
+		},
+	}
+
+	if err := controllerutil.SetControllerReference(cluster, leaderService, r.Scheme); err != nil {
+		return err
+	}
+
+	return r.createOrUpdateService(ctx, leaderService)
 }
 
 func (r *KurrentClusterReconciler) createOrUpdateService(ctx context.Context, service *corev1.Service) error {
@@ -424,12 +464,12 @@ func (r *KurrentClusterReconciler) buildEnvironmentVariables(cluster *kurrentv1.
 		},
 		{
 			Name: "KURRENTDB_NODE_HOST_ADVERTISE_AS",
-    		ValueFrom: &corev1.EnvVarSource{
-      			FieldRef: &corev1.ObjectFieldSelector{
-        			FieldPath: "status.podIP",
-      			},
-    		},
-  		},
+			ValueFrom: &corev1.EnvVarSource{
+				FieldRef: &corev1.ObjectFieldSelector{
+					FieldPath: "status.podIP",
+				},
+			},
+		},
 		{
 			Name:  "KURRENTDB_CLUSTER_SIZE",
 			Value: strconv.Itoa(int(cluster.Spec.Size)),
@@ -485,10 +525,40 @@ func (r *KurrentClusterReconciler) updateStatus(ctx context.Context, cluster *ku
 		return err
 	}
 
-	// Update status based on StatefulSet
+	podList := &corev1.PodList{}
+	listOpts := []client.ListOption{
+		client.InNamespace(cluster.Namespace),
+		client.MatchingLabels{
+			"app.kubernetes.io/name":     "kurrentdb",
+			"app.kubernetes.io/instance": cluster.Name,
+		},
+	}
+	if err := r.List(ctx, podList, listOpts...); err != nil {
+		return err
+	}
+
+	nodeStatuses := []kurrentv1.NodeStatus{}
+	for _, pod := range podList.Items {
+		ready := false
+		for _, cond := range pod.Status.Conditions {
+			if cond.Type == corev1.PodReady && cond.Status == corev1.ConditionTrue {
+				ready = true
+				break
+			}
+		}
+
+		nodeStatuses = append(nodeStatuses, kurrentv1.NodeStatus{
+			Name:  pod.Name,
+			Ready: ready,
+			Role:  pod.Labels["community.kurrent.io/role"],
+		})
+	}
+
+	// Update status
 	cluster.Status.Replicas = statefulSet.Status.Replicas
 	cluster.Status.ReadyReplicas = statefulSet.Status.ReadyReplicas
 	cluster.Status.ObservedGeneration = cluster.Generation
+	cluster.Status.Nodes = nodeStatuses
 
 	// Determine phase
 	if cluster.Status.ReadyReplicas == cluster.Spec.Size {
